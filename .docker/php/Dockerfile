@@ -2,6 +2,7 @@ FROM php:8.5-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \
+    linux-headers \
     libpq-dev \
     zip \
     unzip \
@@ -14,7 +15,7 @@ RUN apk add --no-cache \
     su-exec
 
 # Install PHP extensions
-RUN docker-php-ext-install pdo pdo_mysql mbstring intl zip pcntl
+RUN docker-php-ext-install sockets pdo pdo_mysql mbstring intl zip pcntl
 
 # Download PIE
 RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS linux-headers zstd-dev lz4-dev liblzf-dev; \
