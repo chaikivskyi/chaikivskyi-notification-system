@@ -7,6 +7,7 @@ use App\Enums\UserNotificationPriority;
 use App\Models\UserNotification;
 use App\Notifications\Channels\PushChannel;
 use App\Notifications\Channels\SmsChannel;
+use App\Notifications\Middleware\PushCorrelationContext;
 use App\Repositories\UserNotificationRepository;
 use App\Support\Queues;
 use App\Support\RateLimiters;
@@ -81,6 +82,7 @@ class UserNotificationMessage extends Notification implements ShouldQueue
     public function middleware(object $notifiable, string $channel): array
     {
         return [
+            new PushCorrelationContext($this->notification->correlation_id),
             new RateLimited($this->limiterFor()),
             (new WithoutOverlapping("user-notification:{$this->notification->id}"))->dontRelease(),
         ];

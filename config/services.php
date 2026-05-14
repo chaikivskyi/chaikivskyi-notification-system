@@ -42,4 +42,8 @@ return [
         ],
     ],
 
+    'metrics' => [
+        'token' => env('METRICS_TOKEN'),
+    ],
+
 ];

@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: notification-system
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - nginx
+    # Must match METRICS_TOKEN in the app's .env.
+    authorization:
+      type: Bearer
+      credentials: dev-metrics-token

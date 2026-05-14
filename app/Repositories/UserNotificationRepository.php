@@ -7,12 +7,15 @@ use App\DTOs\UserNotificationFilter;
 use App\Enums\UserNotificationPriority;
 use App\Enums\UserNotificationStatus;
 use App\Events\UserNotificationCreated;
+use App\Events\UserNotificationStatusTransitioned;
+use App\Http\Middleware\CorrelationId;
 use App\Models\UserNotification;
 use App\Support\Pagination;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 
 class UserNotificationRepository
@@ -40,6 +43,7 @@ class UserNotificationRepository
             'subject' => $data->subject,
             'body' => $data->body,
             'priority' => $data->priority ?? UserNotificationPriority::Normal,
+            'correlation_id' => $this->currentCorrelationId(),
         ]);
 
         UserNotificationCreated::dispatch($notification);
@@ -55,6 +59,7 @@ class UserNotificationRepository
     {
         $batchId = Str::uuid7()->toString();
         $now = now();
+        $correlationId = $this->currentCorrelationId();
 
         $rows = array_map(fn (UserNotificationData $item) => [
             'user_id' => $item->userId,
@@ -63,6 +68,7 @@ class UserNotificationRepository
             'subject' => $item->subject,
             'body' => $item->body,
             'priority' => ($item->priority ?? UserNotificationPriority::Normal)->value,
+            'correlation_id' => $correlationId,
             'created_at' => $now,
             'updated_at' => $now,
         ], $items);
@@ -123,6 +129,8 @@ class UserNotificationRepository
     {
         $userNotification->update(['status' => UserNotificationStatus::Canceled]);
 
+        UserNotificationStatusTransitioned::dispatch($userNotification, UserNotificationStatus::Canceled);
+
         return $userNotification;
     }
 
@@ -138,6 +146,8 @@ class UserNotificationRepository
         }
 
         $notification->status = UserNotificationStatus::Pending;
+
+        UserNotificationStatusTransitioned::dispatch($notification, UserNotificationStatus::Pending);
 
         return true;
     }
@@ -155,6 +165,8 @@ class UserNotificationRepository
 
         $notification->status = UserNotificationStatus::Failed;
 
+        UserNotificationStatusTransitioned::dispatch($notification, UserNotificationStatus::Failed);
+
         return true;
     }
 
@@ -171,6 +183,15 @@ class UserNotificationRepository
 
         $notification->status = UserNotificationStatus::Delivered;
 
+        UserNotificationStatusTransitioned::dispatch($notification, UserNotificationStatus::Delivered);
+
         return true;
+    }
+
+    private function currentCorrelationId(): ?string
+    {
+        $value = Context::get(CorrelationId::CONTEXT_KEY);
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }

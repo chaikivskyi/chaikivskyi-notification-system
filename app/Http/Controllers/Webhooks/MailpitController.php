@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\CorrelationId;
 use App\Http\Requests\Webhooks\MailpitWebhookRequest;
 use App\Models\UserNotification;
 use App\Repositories\UserNotificationRepository;
 use App\Services\NotificationTagParser;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Log;
 
 class MailpitController extends Controller
@@ -31,6 +33,10 @@ class MailpitController extends Controller
             Log::warning('Invalid notification id.', ['notificationId' => $notificationId]);
 
             return response()->json(['status' => 'ok']);
+        }
+
+        if ($notification->correlation_id) {
+            Context::add(CorrelationId::CONTEXT_KEY, $notification->correlation_id);
         }
 
         $repository->markDelivered($notification);

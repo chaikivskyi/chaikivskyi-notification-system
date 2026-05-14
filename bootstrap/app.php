@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CorrelationId;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -24,11 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::prefix('webhooks')
                 ->name('webhooks.')
                 ->group(base_path('routes/webhooks.php'));
-
         }
     )
+    ->withEvents()
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->append(CorrelationId::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions

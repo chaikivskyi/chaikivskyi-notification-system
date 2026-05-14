@@ -74,6 +74,17 @@ services:
         environment:
             MP_WEBHOOK_URL: 'http://${MAILPIT_WEBHOOK_USER:-webhook}:${MAILPIT_WEBHOOK_PASSWORD:-secret}@nginx/webhooks/mailpit'
             MP_WEBHOOK_LIMIT: 0
+    prometheus:
+        image: prom/prometheus:latest
+        ports:
+            - '${FORWARD_PROMETHEUS_PORT:-9090}:9090'
+        volumes:
+            - ./.docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+            - prometheus_data:/prometheus
+        networks:
+            - laravel_network
+        depends_on:
+            - nginx
 networks:
     laravel_network:
         driver: bridge
@@ -81,3 +92,4 @@ networks:
 volumes:
     mysql_data:
     kv_data:
+    prometheus_data:

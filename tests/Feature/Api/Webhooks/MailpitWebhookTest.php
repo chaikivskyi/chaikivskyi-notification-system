@@ -5,6 +5,8 @@ namespace Tests\Feature\Api\Webhooks;
 use App\Enums\UserNotificationStatus;
 use App\Models\UserNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class MailpitWebhookTest extends TestCase
@@ -13,8 +15,9 @@ class MailpitWebhookTest extends TestCase
 
     /**
      * @param  array<string, mixed>  $payload
+     * @return TestResponse<JsonResponse>
      */
-    private function postWebhook(array $payload, bool $authenticated = true): \Illuminate\Testing\TestResponse
+    private function postWebhook(array $payload, bool $authenticated = true): TestResponse
     {
         $headers = $authenticated
             ? ['Authorization' => 'Basic '.base64_encode('webhook:secret')]
