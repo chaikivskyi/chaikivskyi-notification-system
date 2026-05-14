@@ -17,7 +17,7 @@ class StoreBulkRequest extends FormRequest
         return [
             'notifications' => ['required', 'array', 'max:1000'],
             'notifications.*.user_id' => ['required', 'exists:users,id'],
-            'notifications.*.channel' => ['required', 'array', Rule::enum(UserNotificationChannel::class)],
+            'notifications.*.channel' => ['required', Rule::enum(UserNotificationChannel::class)],
             'notifications.*.body' => ['required', 'string', 'max:10000'],
             'notifications.*.subject' => ['nullable', 'string', 'max:255'],
             'notifications.*.priority' => ['nullable', Rule::enum(UserNotificationPriority::class)],

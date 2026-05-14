@@ -16,7 +16,7 @@ class StoreRequest extends FormRequest
     {
         return [
             'user_id' => ['required', 'exists:users,id'],
-            'channel' => ['required', 'array', Rule::enum(UserNotificationChannel::class)],
+            'channel' => ['required', Rule::enum(UserNotificationChannel::class)],
             'body' => ['required', 'string', 'max:10000'],
             'subject' => ['nullable', 'string', 'max:255'],
             'priority' => ['nullable', Rule::enum(UserNotificationPriority::class)],

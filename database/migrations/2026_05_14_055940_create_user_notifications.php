@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('user_notifications', function (Blueprint $table) {
-            $table->id()->primary();
+            $table->id();
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->uuid('batch_id')->nullable();
             $table->enum('channel', ['sms', 'email', 'push']);

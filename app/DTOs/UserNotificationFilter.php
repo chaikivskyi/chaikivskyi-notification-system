@@ -23,8 +23,8 @@ readonly class UserNotificationFilter
         return new self(
             empty($data['status']) ? null : UserNotificationStatus::tryFrom($data['status']),
             empty($data['channel']) ? null : UserNotificationChannel::tryFrom($data['channel']),
-            empty($data['createdFrom']) ? null : Carbon::parse($data['createdFrom']),
-            empty($data['createdTo']) ? null : Carbon::parse($data['createdTo']),
+            empty($data['created_from']) ? null : Carbon::parse($data['created_from']),
+            empty($data['created_to']) ? null : Carbon::parse($data['created_to']),
         );
     }
 }

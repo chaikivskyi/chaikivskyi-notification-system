@@ -56,10 +56,10 @@ class UserNotificationRepository
         $rows = array_map(fn (UserNotificationData $item) => [
             'user_id' => $item->userId,
             'batch_id' => $batchId,
-            'channel' => $item->channel,
+            'channel' => $item->channel->value,
             'subject' => $item->subject,
             'body' => $item->body,
-            'priority' => $item->priority ?? UserNotificationPriority::Normal,
+            'priority' => ($item->priority ?? UserNotificationPriority::Normal)->value,
             'status' => UserNotificationStatus::Pending->value,
             'created_at' => $now,
             'updated_at' => $now,
@@ -86,7 +86,7 @@ class UserNotificationRepository
         }
 
         if ($statuses->count() === 1) {
-            return UserNotificationStatus::from($statuses->first());
+            return $statuses->first();
         }
 
         if ($statuses->contains(UserNotificationStatus::Pending)) {

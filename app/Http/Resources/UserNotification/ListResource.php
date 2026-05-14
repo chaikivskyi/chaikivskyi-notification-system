@@ -22,7 +22,7 @@ class ListResource extends JsonResource
             'status' => $this->resource->status,
             'channel' => $this->resource->channel,
             'created_at' => $this->resource->created_at,
-            'update_at' => $this->resource->updated_at,
+            'updated_at' => $this->resource->updated_at,
         ];
     }
 }

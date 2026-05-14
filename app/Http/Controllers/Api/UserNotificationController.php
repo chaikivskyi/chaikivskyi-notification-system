@@ -67,7 +67,7 @@ class UserNotificationController extends Controller
         ]);
 
         $status = $notificationRepository->status(
-            $request->integer('id'),
+            $request->filled('id') ? $request->integer('id') : null,
             $request->input('batch_id'),
         );
 
