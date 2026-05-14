@@ -4,12 +4,20 @@ namespace Tests\Feature\Api\UserNotification;
 
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Notifications\UserNotificationMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class StoreBulkTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Notification::fake();
+    }
 
     public function test_inserts_all_items_with_shared_batch_id(): void
     {
@@ -29,6 +37,8 @@ class StoreBulkTest extends TestCase
         $batchIds = UserNotification::query()->pluck('batch_id')->unique();
         $this->assertCount(1, $batchIds);
         $this->assertNotNull($batchIds->first());
+
+        Notification::assertSentToTimes($user, UserNotificationMessage::class, 3);
     }
 
     public function test_sets_all_inserted_rows_to_pending(): void

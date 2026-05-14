@@ -3,12 +3,20 @@
 namespace Tests\Feature\Api\UserNotification;
 
 use App\Models\User;
+use App\Notifications\UserNotificationMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class StoreTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Notification::fake();
+    }
 
     public function test_creates_notification_with_required_fields(): void
     {
@@ -31,6 +39,8 @@ class StoreTest extends TestCase
             'body' => 'Hello',
             'status' => 'pending',
         ]);
+
+        Notification::assertSentTo($user, UserNotificationMessage::class);
     }
 
     public function test_honors_explicit_priority(): void

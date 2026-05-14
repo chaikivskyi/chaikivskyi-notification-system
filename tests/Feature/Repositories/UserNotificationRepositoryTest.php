@@ -13,6 +13,7 @@ use App\Repositories\UserNotificationRepository;
 use App\Support\Pagination;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -25,14 +26,15 @@ class UserNotificationRepositoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repository = new UserNotificationRepository();
+        Notification::fake();
+        $this->repository = new UserNotificationRepository;
     }
 
     public function test_list_returns_paginator_with_default_per_page(): void
     {
         UserNotification::factory()->count(30)->create();
 
-        $page = $this->repository->list(new UserNotificationFilter());
+        $page = $this->repository->list(new UserNotificationFilter);
 
         $this->assertSame(Pagination::DEFAULT_PER_PAGE, $page->perPage());
         $this->assertSame(30, $page->total());
@@ -43,7 +45,7 @@ class UserNotificationRepositoryTest extends TestCase
     {
         UserNotification::factory()->count(10)->create();
 
-        $page = $this->repository->list(new UserNotificationFilter(), perPage: 5);
+        $page = $this->repository->list(new UserNotificationFilter, perPage: 5);
 
         $this->assertSame(5, $page->perPage());
         $this->assertCount(5, $page->items());
@@ -95,7 +97,7 @@ class UserNotificationRepositoryTest extends TestCase
         $b = UserNotification::factory()->create();
         $c = UserNotification::factory()->create();
 
-        $page = $this->repository->list(new UserNotificationFilter());
+        $page = $this->repository->list(new UserNotificationFilter);
 
         $ids = collect($page->items())->pluck('id')->all();
         $this->assertSame([$c->id, $b->id, $a->id], $ids);
@@ -244,5 +246,26 @@ class UserNotificationRepositoryTest extends TestCase
         $this->repository->cancel($notification);
 
         $this->assertSame(UserNotificationStatus::Canceled, $notification->refresh()->status);
+    }
+
+    public function test_claim_for_delivery_transitions_accepted_to_pending(): void
+    {
+        $notification = UserNotification::factory()->create(['status' => UserNotificationStatus::Accepted]);
+
+        $claimed = $this->repository->claimForDelivery($notification);
+
+        $this->assertTrue($claimed);
+        $this->assertSame(UserNotificationStatus::Pending, $notification->status);
+        $this->assertSame(UserNotificationStatus::Pending, $notification->refresh()->status);
+    }
+
+    public function test_claim_for_delivery_is_idempotent_when_already_claimed(): void
+    {
+        $notification = UserNotification::factory()->pending()->create();
+
+        $claimed = $this->repository->claimForDelivery($notification);
+
+        $this->assertFalse($claimed);
+        $this->assertSame(UserNotificationStatus::Pending, $notification->refresh()->status);
     }
 }

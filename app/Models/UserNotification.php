@@ -7,7 +7,6 @@ use App\Enums\UserNotificationPriority;
 use App\Enums\UserNotificationStatus;
 use Database\Factories\UserNotificationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,10 +25,10 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $updated_at
  * @property-read ?User $user
  */
-#[UseFactory(UserNotificationFactory::class)]
 #[Fillable(['user_id', 'batch_id', 'channel', 'status', 'subject', 'body', 'priority'])]
 class UserNotification extends Model
 {
+    /** @use HasFactory<UserNotificationFactory> */
     use HasFactory;
 
     protected $casts = [
@@ -40,6 +39,7 @@ class UserNotification extends Model
 
     protected $attributes = [
         'priority' => UserNotificationPriority::Normal,
+        'status' => UserNotificationStatus::Accepted,
     ];
 
     /**

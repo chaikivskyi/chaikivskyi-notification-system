@@ -18,7 +18,7 @@ return new class extends Migration
             $table->enum('channel', ['sms', 'email', 'push']);
             $table->string('subject')->nullable();
             $table->text('body');
-            $table->enum('status', ['pending', 'delivered', 'failed', 'canceled']);
+            $table->enum('status', ['accepted', 'pending', 'delivered', 'failed', 'canceled'])->default('accepted');
             $table->enum('priority', ['low', 'normal', 'high'])->default('normal');
             $table->timestamps();
 

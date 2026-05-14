@@ -6,6 +6,7 @@ use App\DTOs\UserNotificationData;
 use App\DTOs\UserNotificationFilter;
 use App\Enums\UserNotificationPriority;
 use App\Enums\UserNotificationStatus;
+use App\Events\UserNotificationCreated;
 use App\Models\UserNotification;
 use App\Support\Pagination;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -32,16 +33,18 @@ class UserNotificationRepository
 
     public function store(UserNotificationData $data, ?string $batchId = null): UserNotification
     {
-        return UserNotification::query()
-            ->create([
-                'user_id' => $data->userId,
-                'batch_id' => $batchId,
-                'channel' => $data->channel,
-                'subject' => $data->subject,
-                'body' => $data->body,
-                'priority' => $data->priority ?? UserNotificationPriority::Normal,
-                'status' => UserNotificationStatus::Pending,
-            ]);
+        $notification = UserNotification::query()->create([
+            'user_id' => $data->userId,
+            'batch_id' => $batchId,
+            'channel' => $data->channel,
+            'subject' => $data->subject,
+            'body' => $data->body,
+            'priority' => $data->priority ?? UserNotificationPriority::Normal,
+        ]);
+
+        UserNotificationCreated::dispatch($notification);
+
+        return $notification;
     }
 
     /**
@@ -60,14 +63,22 @@ class UserNotificationRepository
             'subject' => $item->subject,
             'body' => $item->body,
             'priority' => ($item->priority ?? UserNotificationPriority::Normal)->value,
-            'status' => UserNotificationStatus::Pending->value,
             'created_at' => $now,
             'updated_at' => $now,
         ], $items);
 
         UserNotification::query()->insert($rows);
 
-        return UserNotification::query()->where('batch_id', $batchId)->get();
+        $notifications = UserNotification::query()
+            ->with('user')
+            ->where('batch_id', $batchId)
+            ->get();
+
+        foreach ($notifications as $notification) {
+            UserNotificationCreated::dispatch($notification);
+        }
+
+        return $notifications;
     }
 
     public function status(?int $id = null, ?string $batchId = null): ?UserNotificationStatus
@@ -87,6 +98,10 @@ class UserNotificationRepository
 
         if ($statuses->count() === 1) {
             return $statuses->first();
+        }
+
+        if ($statuses->contains(UserNotificationStatus::Accepted)) {
+            return UserNotificationStatus::Accepted;
         }
 
         if ($statuses->contains(UserNotificationStatus::Pending)) {
@@ -109,5 +124,37 @@ class UserNotificationRepository
         $userNotification->update(['status' => UserNotificationStatus::Canceled]);
 
         return $userNotification;
+    }
+
+    public function claimForDelivery(UserNotification $notification): bool
+    {
+        $claimed = UserNotification::query()
+            ->whereKey($notification->id)
+            ->where('status', UserNotificationStatus::Accepted)
+            ->update(['status' => UserNotificationStatus::Pending]);
+
+        if ($claimed === 0) {
+            return false;
+        }
+
+        $notification->status = UserNotificationStatus::Pending;
+
+        return true;
+    }
+
+    public function markFailed(UserNotification $notification): bool
+    {
+        $updated = UserNotification::query()
+            ->whereKey($notification->id)
+            ->where('status', UserNotificationStatus::Accepted)
+            ->update(['status' => UserNotificationStatus::Failed]);
+
+        if ($updated === 0) {
+            return false;
+        }
+
+        $notification->status = UserNotificationStatus::Failed;
+
+        return true;
     }
 }
