@@ -268,4 +268,25 @@ class UserNotificationRepositoryTest extends TestCase
         $this->assertFalse($claimed);
         $this->assertSame(UserNotificationStatus::Pending, $notification->refresh()->status);
     }
+
+    public function test_mark_delivered_transitions_pending_to_delivered(): void
+    {
+        $notification = UserNotification::factory()->pending()->create();
+
+        $marked = $this->repository->markDelivered($notification);
+
+        $this->assertTrue($marked);
+        $this->assertSame(UserNotificationStatus::Delivered, $notification->status);
+        $this->assertSame(UserNotificationStatus::Delivered, $notification->refresh()->status);
+    }
+
+    public function test_mark_delivered_is_no_op_when_not_pending(): void
+    {
+        $notification = UserNotification::factory()->canceled()->create();
+
+        $marked = $this->repository->markDelivered($notification);
+
+        $this->assertFalse($marked);
+        $this->assertSame(UserNotificationStatus::Canceled, $notification->refresh()->status);
+    }
 }

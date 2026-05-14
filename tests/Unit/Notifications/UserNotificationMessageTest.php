@@ -14,6 +14,7 @@ use Illuminate\Queue\Attributes\Tries;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionClass;
 use stdClass;
+use Symfony\Component\Mime\Email;
 use Tests\TestCase;
 
 class UserNotificationMessageTest extends TestCase
@@ -74,6 +75,23 @@ class UserNotificationMessageTest extends TestCase
 
         $this->assertSame(3, $tries->tries);
         $this->assertSame([30, 60, 120], $backoff->backoff);
+    }
+
+    public function test_to_mail_attaches_notification_tag_header(): void
+    {
+        $notification = $this->makeNotification();
+        $notification->forceFill(['id' => 42]);
+
+        $mail = (new UserNotificationMessage($notification))->toMail(new stdClass);
+
+        $email = new Email;
+        foreach ($mail->callbacks as $callback) {
+            $callback($email);
+        }
+
+        $header = $email->getHeaders()->get('X-Tags');
+        $this->assertNotNull($header);
+        $this->assertSame('notification-42', $header->getBody());
     }
 
     private function makeNotification(

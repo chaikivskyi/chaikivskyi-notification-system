@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'mailpit' => [
+        'webhook' => [
+            'user' => env('MAILPIT_WEBHOOK_USER'),
+            'password' => env('MAILPIT_WEBHOOK_PASSWORD'),
+        ],
+    ],
+
 ];

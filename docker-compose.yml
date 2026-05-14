@@ -71,6 +71,9 @@ services:
             - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
         networks:
             - laravel_network
+        environment:
+            MP_WEBHOOK_URL: 'http://${MAILPIT_WEBHOOK_USER:-webhook}:${MAILPIT_WEBHOOK_PASSWORD:-secret}@nginx/webhooks/mailpit'
+            MP_WEBHOOK_LIMIT: 0
 networks:
     laravel_network:
         driver: bridge

@@ -146,7 +146,7 @@ class UserNotificationRepository
     {
         $updated = UserNotification::query()
             ->whereKey($notification->id)
-            ->where('status', UserNotificationStatus::Accepted)
+            ->whereIn('status', [UserNotificationStatus::Accepted, UserNotificationStatus::Pending])
             ->update(['status' => UserNotificationStatus::Failed]);
 
         if ($updated === 0) {
@@ -154,6 +154,22 @@ class UserNotificationRepository
         }
 
         $notification->status = UserNotificationStatus::Failed;
+
+        return true;
+    }
+
+    public function markDelivered(UserNotification $notification): bool
+    {
+        $updated = UserNotification::query()
+            ->whereKey($notification->id)
+            ->where('status', UserNotificationStatus::Pending)
+            ->update(['status' => UserNotificationStatus::Delivered]);
+
+        if ($updated === 0) {
+            return false;
+        }
+
+        $notification->status = UserNotificationStatus::Delivered;
 
         return true;
     }

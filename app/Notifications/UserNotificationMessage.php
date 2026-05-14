@@ -19,6 +19,7 @@ use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 #[Backoff([30, 60, 120])]
 #[Tries(3)]
@@ -55,6 +56,13 @@ class UserNotificationMessage extends Notification implements ShouldQueue
         $notification->user->notify(new self($notification));
     }
 
+    public function failed(Throwable $exception): void
+    {
+        report($exception);
+
+        app(UserNotificationRepository::class)->markFailed($this->notification);
+    }
+
     /**
      * @return list<string>
      */
@@ -80,9 +88,14 @@ class UserNotificationMessage extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
+        $notificationId = (string) $this->notification->id;
+
         return (new MailMessage)
             ->line($this->notification->body)
-            ->subject($this->notification->subject ?? 'Notification');
+            ->subject($this->notification->subject ?? 'Notification')
+            ->withSymfonyMessage(function ($message) use ($notificationId): void {
+                $message->getHeaders()->addTextHeader('X-Tags', "notification-{$notificationId}");
+            });
     }
 
     public function toSms(object $notifiable): string
