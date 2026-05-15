@@ -1,58 +1,182 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Notification System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel-based service for accepting, queueing, and delivering user notifications across multiple channels (email, SMS, push). Built on Laravel 13 with SQS-backed queues, Prometheus metrics, and an OpenAPI spec generated from controller annotations.
 
-## About Laravel
+## Setup
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+The project runs entirely in Docker. The `app` service mounts the repo, and `nginx` exposes the HTTP entrypoint on port `8080`.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+1. Copy the example env and adjust as needed:
+   ```bash
+   cp .env.example .env
+   ```
+2. Build and start the stack:
+   ```bash
+   docker compose up -d --build
+   ```
+3. Install PHP dependencies, generate an app key, and run migrations inside the `app` container:
+   ```bash
+   docker compose exec app composer install
+   docker compose exec app php artisan key:generate
+   docker compose exec app php artisan migrate
+   docker compose exec app php artisan db:seed
+   ```
+4. Run a queue worker for the notification queues (in a separate terminal):
+   ```bash
+   docker compose exec app php artisan queue:work sqs \
+       --queue=notifications-high,notifications-normal,notifications-low,default
+   ```
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Services exposed on the host:
 
-## Learning Laravel
+| Service     | URL                                  | Purpose                          |
+| ----------- | ------------------------------------ | -------------------------------- |
+| App (nginx) | http://localhost:8080                | API + webhook endpoints          |
+| API docs    | http://localhost:8080/docs/api       | Scramble-generated Swagger UI    |
+| OpenAPI     | http://localhost:8080/docs/api.json  | Raw OpenAPI 3.x spec             |
+| Mailpit UI  | http://localhost:8025                | Captured outbound mail           |
+| Prometheus  | http://localhost:9090                | Metrics scraper                  |
+| LocalStack  | http://localhost:4566                | SQS emulator                     |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Architecture overview
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+        HTTP API                  Persistence + events                       Queue (SQS)                       Channels
+ ┌──────────────────────┐ calls  ┌──────────────────────┐  UserNotification  ┌────────────────────────┐  via() ┌────────────────┐
+ │ UserNotification     │ ─────▶ │ UserNotification     │ ─── Created ─────▶ │ DispatchUserNotification│ ─────▶ │ mail (Laravel) │
+ │ Controller (API)     │        │ Repository           │      (event)       │ Message (listener)      │        │ SmsChannel     │
+ └──────────────────────┘        │                      │                    │   │                     │        │ PushChannel    │
+                                 │ store/cancel/        │                    │   ▼                     │        └────────────────┘
+                                 │ claim/markDelivered/ │                    │ UserNotificationMessage │
+                                 │ markFailed           │                    │ (queued Notification)   │
+                                 │                      │                    └────────────────────────┘
+                                 │                      │  UserNotificationStatusTransitioned (event)
+                                 │                      │ ──────────────────────────────────────┐
+                                 └──────────────────────┘                                       ▼
+                                                                                     ┌────────────────────────┐
+                                                                                     │ RecordUserNotification │
+                                                                                     │ Metric (listener)      │
+                                                                                     │  → PersistUserNotifi-  │
+                                                                                     │    cationMetric (job)  │
+                                                                                     └────────────────────────┘
+                                                                                                 │
+                                                                                                 ▼
+                                                                                     ┌────────────────────────┐
+                                                                                     │ Prometheus counters    │
+                                                                                     │ + delivery latency     │
+                                                                                     └────────────────────────┘
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Key pieces:
 
-## Contributing
+- **API layer** (`app/Http/Controllers/Api`) — accepts single and bulk notification requests, returns status, supports cancellation. Validated via `FormRequest` classes under `app/Http/Requests/UserNotification`. The controller delegates to the repository and does **not** dispatch events itself.
+- **Repository** (`app/Repositories/UserNotificationRepository.php`) — single source of truth for state transitions (`Accepted → Pending → Delivered | Failed | Canceled`) and the **only** place that dispatches domain events:
+  - `UserNotificationCreated` — on `store()` and each row of `storeBulk()`.
+  - `UserNotificationStatusTransitioned` — on `cancel()`, `claimForDelivery()`, `markDelivered()`, and `markFailed()`.
+- **Listeners** (`app/Listeners`):
+  - `DispatchUserNotificationMessage` reacts to `UserNotificationCreated` and dispatches the queued `UserNotificationMessage` notification.
+  - `RecordUserNotificationMetric` reacts to `UserNotificationStatusTransitioned` and dispatches `PersistUserNotificationMetric` to record timestamps + Prometheus counters.
+- **Queue routing** — notifications are dispatched to one of three SQS queues based on priority: `notifications-high`, `notifications-normal`, `notifications-low` (see `app/Support/Queues.php`).
+- **Notification class** (`app/Notifications/UserNotificationMessage.php`) — extends Laravel's `Notification`, picks the channel via `via()`, attaches a correlation-ID middleware, a per-channel rate limiter, and `WithoutOverlapping` for idempotency. `dispatchFor()` also calls `claimForDelivery()` so the `Accepted → Pending` transition is atomic.
+- **Channels** (`app/Notifications/Channels`) — `SmsChannel` and `PushChannel` currently **log the payload only**; integrations with real providers are not wired up. Email goes through Laravel's built-in `mail` channel into Mailpit in local dev.
+- **Mailpit webhook** (`routes/webhooks.php`, `app/Http/Controllers/Webhooks/MailpitController.php`) — Mailpit posts delivery events back to `/webhooks/mailpit` (HTTP Basic-auth protected via `MAILPIT_WEBHOOK_USER` / `MAILPIT_WEBHOOK_PASSWORD`); the controller calls `markDelivered()` on the repository, which in turn emits `UserNotificationStatusTransitioned`.
+- **Metrics** (`app/Prometheus`, `PersistUserNotificationMetric` job) — first-transition timestamps (`queued_at`, `delivered_at`, `failed_at`, `canceled_at`) are recorded per notification, plus a delivery-latency histogram and a status counter exposed at `/metrics`.
+- **Correlation IDs** (`app/Http/Middleware/CorrelationId.php`, `PushCorrelationContext` middleware) — propagated from the inbound request, through the queue, into log lines.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## API examples
 
-## Code of Conduct
+The full, always-current schema is published at **`/docs/api`** (Swagger UI) and **`/docs/api.json`** (OpenAPI spec). The examples below cover the common flows.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Create a notification
 
-## Security Vulnerabilities
+```bash
+curl -X POST http://localhost:8080/api/user-notifications \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -d '{
+    "user_id": 1,
+    "channel": "email",
+    "subject": "Hello",
+    "body": "Welcome to the service.",
+    "priority": "normal"
+  }'
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+`channel` ∈ `email | sms | push`. `priority` ∈ `low | normal | high` (default `normal`).
 
-## License
+### Bulk create
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+  curl --request POST \
+    --url http://localhost:8080/api/user-notifications/bulk \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json' \
+    --data '{
+    "notifications": [
+      {
+        "user_id": 1,
+        "channel": "sms",
+        "body": "string",
+        "subject": "string",
+        "priority": "low"
+      },
+      {
+        "user_id": 1,
+        "channel": "email",
+        "body": "string",
+        "subject": "string",
+        "priority": "low"
+      }
+    ]
+  }'
+```
+
+Responds with the created notifications, each sharing a generated `batch_id` (UUID v7).
+
+### List with filters
+
+```bash
+curl 'http://localhost:8080/api/user-notifications?filters[status]=delivered&filters[channel]=email&per_page=20'
+```
+
+Filter keys: `status`, `channel`, `created_from`, `created_to`. Standard Laravel pagination response.
+
+### Status of a single notification or a batch
+
+```bash
+curl 'http://localhost:8080/api/user-notifications/status?id=42'
+curl 'http://localhost:8080/api/user-notifications/status?batch_id=018f...'
+```
+
+Exactly one of `id` or `batch_id` is required. For a batch, the response collapses to the least-progressed status (`accepted > pending > failed > canceled > delivered`).
+
+### Cancel a notification
+
+```bash
+curl -X PATCH http://localhost:8080/api/user-notifications/42/cancel
+```
+
+Cancellation is a hard transition to `canceled`; it does **not** retract a job that is already mid-flight.
+
+## Makefile commands
+
+| Target              | Description                                                     |
+| ------------------- | --------------------------------------------------------------- |
+| `make shell`        | Open a shell inside the `app` container.                        |
+| `make run-tests`    | Run the PHPUnit suite (`./vendor/bin/phpunit`) inside the app.  |
+
+Static analysis (`phpstan`) is not in the Makefile; run it directly when needed:
+
+```bash
+docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=512M
+```
+
+## Status of channels
+
+| Channel | Status                              | Notes                                                                 |
+| ------- | ----------------------------------- | --------------------------------------------------------------------- |
+| Email   | Implemented                         | Routed through Laravel's `mail` channel; Mailpit in local dev.        |
+| SMS     | **Not implemented**                 | `SmsChannel` only logs the payload — no provider integration yet.     |
+| Push    | **Not implemented**                 | `PushChannel` only logs the payload — no provider integration yet.    |
+
+Wiring SMS and push to real providers (or to a generic webhook-style external provider) is intentionally left as the next integration step.
