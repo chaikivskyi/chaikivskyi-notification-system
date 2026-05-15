@@ -144,7 +144,7 @@ Filter keys: `status`, `channel`, `created_from`, `created_to`. Standard Laravel
 ### Status of a single notification or a batch
 
 ```bash
-curl 'http://localhost:8080/api/user-notifications/status?id=42'
+curl 'http://localhost:8080/api/user-notifications/status?id=1'
 curl 'http://localhost:8080/api/user-notifications/status?batch_id=018f...'
 ```
 
@@ -160,16 +160,12 @@ Cancellation is a hard transition to `canceled`; it does **not** retract a job t
 
 ## Makefile commands
 
-| Target              | Description                                                     |
-| ------------------- | --------------------------------------------------------------- |
-| `make shell`        | Open a shell inside the `app` container.                        |
-| `make run-tests`    | Run the PHPUnit suite (`./vendor/bin/phpunit`) inside the app.  |
-
-Static analysis (`phpstan`) is not in the Makefile; run it directly when needed:
-
-```bash
-docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=512M
-```
+| Target              | Description                                                                 |
+| ------------------- | --------------------------------------------------------------------------- |
+| `make shell`        | Open a shell inside the `app` container.                                    |
+| `make run-tests`    | Run the PHPUnit suite (`./vendor/bin/phpunit`) inside the app.              |
+| `make pint`         | Run Laravel Pint to format the codebase (`composer pint`).                  |
+| `make phpstan`      | Run PHPStan static analysis (`composer phpstan`, 1G memory limit).          |
 
 ## Status of channels
 
