@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Enums\UserNotificationChannel;
 use App\Enums\UserNotificationPriority;
+use App\Enums\UserNotificationStatus;
 use App\Models\UserNotification;
 use App\Notifications\Channels\PushChannel;
 use App\Notifications\Channels\SmsChannel;
@@ -51,6 +52,11 @@ class UserNotificationMessage extends Notification implements ShouldQueue
         }
 
         if (! $repository->claimForDelivery($notification)) {
+            Log::warning('The notification is not suitable for delivery.', [
+                'notification' => $notification->id,
+                'status' => $notification->status->value,
+            ]);
+
             return;
         }
 
@@ -74,6 +80,22 @@ class UserNotificationMessage extends Notification implements ShouldQueue
             UserNotificationChannel::Sms => SmsChannel::class,
             UserNotificationChannel::Push => PushChannel::class,
         }];
+    }
+
+    public function shouldSend(object $notifiable): bool
+    {
+        $fresh = $this->notification->fresh();
+
+        if ($fresh === null || $fresh->status === UserNotificationStatus::Canceled) {
+            Log::info('Skipping canceled or missing notification.', [
+                'notification' => $this->notification->id,
+                'channel' => $this->notification->channel->value,
+            ]);
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
