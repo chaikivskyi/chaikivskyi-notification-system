@@ -99,7 +99,7 @@ class StoreTest extends TestCase
     public function test_rejects_unknown_user_id(): void
     {
         $this->postJson('/api/user-notifications', [
-            'user_id' => 999999,
+            'user_id' => '01900000-0000-7000-8000-000000000000',
             'channel' => 'email',
             'body' => 'x',
         ])
@@ -247,5 +247,78 @@ class StoreTest extends TestCase
             'body' => 'x',
             'subject' => str_repeat('a', 65),
         ])->assertCreated();
+    }
+
+    public function test_stores_schedule_when_scheduled_at_is_present(): void
+    {
+        $user = User::factory()->create();
+        $scheduledAt = now()->addHour()->startOfSecond();
+
+        $response = $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'email',
+            'body' => 'x',
+            'scheduled_at' => $scheduledAt->toIso8601String(),
+        ])->assertCreated();
+
+        $notificationId = $response->json('data.id');
+
+        $this->assertDatabaseHas('user_notifications', [
+            'id' => $notificationId,
+            'is_scheduled' => true,
+        ]);
+        $this->assertDatabaseHas('user_notification_schedules', [
+            'user_notification_id' => $notificationId,
+            'scheduled_at' => $scheduledAt->toDateTimeString(),
+        ]);
+    }
+
+    public function test_does_not_store_schedule_when_scheduled_at_is_missing(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'email',
+            'body' => 'x',
+        ])->assertCreated();
+
+        $notificationId = $response->json('data.id');
+
+        $this->assertDatabaseHas('user_notifications', [
+            'id' => $notificationId,
+            'is_scheduled' => false,
+        ]);
+        $this->assertDatabaseMissing('user_notification_schedules', [
+            'user_notification_id' => $notificationId,
+        ]);
+    }
+
+    public function test_rejects_past_scheduled_at(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'email',
+            'body' => 'x',
+            'scheduled_at' => now()->subHour()->toIso8601String(),
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('scheduled_at');
+    }
+
+    public function test_rejects_invalid_scheduled_at(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'email',
+            'body' => 'x',
+            'scheduled_at' => 'not-a-date',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('scheduled_at');
     }
 }

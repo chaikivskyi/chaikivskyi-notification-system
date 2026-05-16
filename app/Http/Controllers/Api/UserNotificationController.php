@@ -62,12 +62,12 @@ class UserNotificationController extends Controller
     public function status(Request $request, UserNotificationRepository $notificationRepository): JsonResponse
     {
         $request->validate([
-            'id' => ['required_without:batch_id', 'prohibits:batch_id', 'integer', 'exists:user_notifications,id'],
+            'id' => ['required_without:batch_id', 'prohibits:batch_id', 'uuid', 'exists:user_notifications,id'],
             'batch_id' => ['required_without:id', 'uuid', 'exists:user_notifications,batch_id'],
         ]);
 
         $status = $notificationRepository->status(
-            $request->filled('id') ? $request->integer('id') : null,
+            $request->filled('id') ? (string) $request->input('id') : null,
             $request->input('batch_id'),
         );
 

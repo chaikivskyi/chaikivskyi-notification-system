@@ -9,6 +9,8 @@ class DispatchUserNotificationMessage
 {
     public function handle(UserNotificationCreated $event): void
     {
-        UserNotificationMessage::dispatchFor($event->notification);
+        if (! $event->notification->is_scheduled) {
+            UserNotificationMessage::dispatchFor($event->notification);
+        }
     }
 }

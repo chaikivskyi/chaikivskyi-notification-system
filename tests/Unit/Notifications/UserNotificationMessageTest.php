@@ -80,7 +80,8 @@ class UserNotificationMessageTest extends TestCase
     public function test_to_mail_attaches_notification_tag_header(): void
     {
         $notification = $this->makeNotification();
-        $notification->forceFill(['id' => 42]);
+        $uuid = '0190abcd-0000-7000-8000-000000000042';
+        $notification->forceFill(['id' => $uuid]);
 
         $mail = (new UserNotificationMessage($notification))->toMail(new stdClass);
 
@@ -91,7 +92,7 @@ class UserNotificationMessageTest extends TestCase
 
         $header = $email->getHeaders()->get('X-Tags');
         $this->assertNotNull($header);
-        $this->assertSame('notification-42', $header->getBody());
+        $this->assertSame("notification-{$uuid}", $header->getBody());
     }
 
     private function makeNotification(

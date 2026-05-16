@@ -8,17 +8,17 @@ use App\Enums\UserNotificationStatus;
 use Database\Factories\UserNotificationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
- * @property int $id
- * @property ?int $user_id
+ * @property string $id
+ * @property ?string $user_id
  * @property ?string $batch_id
  * @property UserNotificationChannel $channel
  * @property UserNotificationStatus $status
+ * @property bool $is_scheduled
  * @property ?string $subject
  * @property string $body
  * @property UserNotificationPriority $priority
@@ -27,8 +27,9 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $updated_at
  * @property-read ?User $user
  * @property-read ?UserNotificationMetric $metric
+ * @property-read ?UserNotificationSchedule $schedule
  */
-#[Fillable(['user_id', 'batch_id', 'channel', 'status', 'subject', 'body', 'priority', 'correlation_id'])]
+#[Fillable(['user_id', 'batch_id', 'channel', 'status', 'subject', 'body', 'priority', 'correlation_id', 'is_scheduled'])]
 class UserNotification extends Model
 {
     /** @use HasFactory<UserNotificationFactory> */
@@ -38,11 +39,13 @@ class UserNotification extends Model
         'status' => UserNotificationStatus::class,
         'channel' => UserNotificationChannel::class,
         'priority' => UserNotificationPriority::class,
+        'is_scheduled' => 'boolean',
     ];
 
     protected $attributes = [
         'priority' => UserNotificationPriority::Normal,
         'status' => UserNotificationStatus::Accepted,
+        'is_scheduled' => false,
     ];
 
     /**
@@ -59,5 +62,13 @@ class UserNotification extends Model
     public function metric(): HasOne
     {
         return $this->hasOne(UserNotificationMetric::class, 'user_notification_id');
+    }
+
+    /**
+     * @return HasOne<UserNotificationSchedule, $this>
+     */
+    public function schedule(): HasOne
+    {
+        return $this->hasOne(UserNotificationSchedule::class, 'user_notification_id');
     }
 }

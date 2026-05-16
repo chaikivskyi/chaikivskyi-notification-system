@@ -86,7 +86,7 @@ class StoreBulkTest extends TestCase
         $this->postJson('/api/user-notifications/bulk', [
             'notifications' => [
                 ['user_id' => $user->id, 'channel' => 'email', 'body' => 'a'],
-                ['user_id' => 999999, 'channel' => 'sms', 'body' => 'b'],
+                ['user_id' => '01900000-0000-7000-8000-000000000000', 'channel' => 'sms', 'body' => 'b'],
             ],
         ])
             ->assertStatus(422)
@@ -170,5 +170,43 @@ class StoreBulkTest extends TestCase
                 ['user_id' => $user->id, 'channel' => 'email', 'body' => str_repeat('a', 10000), 'subject' => str_repeat('a', 255)],
             ],
         ])->assertOk();
+    }
+
+    public function test_creates_schedules_only_for_items_with_scheduled_at(): void
+    {
+        $user = User::factory()->create();
+        $scheduledAt = now()->addHour()->startOfSecond();
+
+        $this->postJson('/api/user-notifications/bulk', [
+            'notifications' => [
+                ['user_id' => $user->id, 'channel' => 'email', 'body' => 'a'],
+                ['user_id' => $user->id, 'channel' => 'sms', 'body' => 'b', 'scheduled_at' => $scheduledAt->toIso8601String()],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(1, UserNotification::where('is_scheduled', true)->count());
+        $this->assertSame(1, UserNotification::where('is_scheduled', false)->count());
+
+        $scheduledNotification = UserNotification::where('is_scheduled', true)->firstOrFail();
+        $this->assertSame('sms', $scheduledNotification->channel->value);
+        $this->assertDatabaseHas('user_notification_schedules', [
+            'user_notification_id' => $scheduledNotification->id,
+            'scheduled_at' => $scheduledAt->toDateTimeString(),
+        ]);
+        $this->assertDatabaseCount('user_notification_schedules', 1);
+    }
+
+    public function test_rejects_past_scheduled_at_in_item(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications/bulk', [
+            'notifications' => [
+                ['user_id' => $user->id, 'channel' => 'email', 'body' => 'a'],
+                ['user_id' => $user->id, 'channel' => 'sms', 'body' => 'b', 'scheduled_at' => now()->subHour()->toIso8601String()],
+            ],
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('notifications.1.scheduled_at');
     }
 }

@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\UserNotification;
 use App\Enums\UserNotificationStatus;
 use App\Models\UserNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class CancelTest extends TestCase
@@ -39,7 +40,7 @@ class CancelTest extends TestCase
 
     public function test_returns_404_for_unknown_id(): void
     {
-        $this->patchJson('/api/user-notifications/999999/cancel')
+        $this->patchJson('/api/user-notifications/'.Str::uuid7()->toString().'/cancel')
             ->assertStatus(404);
     }
 }

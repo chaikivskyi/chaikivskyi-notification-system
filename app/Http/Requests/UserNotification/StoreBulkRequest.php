@@ -18,11 +18,12 @@ class StoreBulkRequest extends FormRequest
     {
         return [
             'notifications' => ['required', 'array', 'max:1000'],
-            'notifications.*.user_id' => ['required', 'exists:users,id'],
+            'notifications.*.user_id' => ['required', 'uuid', 'exists:users,id'],
             'notifications.*.channel' => ['required', Rule::enum(UserNotificationChannel::class)],
             'notifications.*.body' => ['required', 'string', new BodyByChannel],
             'notifications.*.subject' => ['nullable', 'string', new SubjectByChannel],
             'notifications.*.priority' => ['nullable', Rule::enum(UserNotificationPriority::class)],
+            'notifications.*.scheduled_at' => ['nullable', 'date', 'after:now'],
         ];
     }
 }

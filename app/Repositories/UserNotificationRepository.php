@@ -10,12 +10,14 @@ use App\Events\UserNotificationCreated;
 use App\Events\UserNotificationStatusTransitioned;
 use App\Http\Middleware\CorrelationId;
 use App\Models\UserNotification;
+use App\Models\UserNotificationSchedule;
 use App\Support\Pagination;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class UserNotificationRepository
@@ -36,15 +38,27 @@ class UserNotificationRepository
 
     public function store(UserNotificationData $data, ?string $batchId = null): UserNotification
     {
-        $notification = UserNotification::query()->create([
-            'user_id' => $data->userId,
-            'batch_id' => $batchId,
-            'channel' => $data->channel,
-            'subject' => $data->subject,
-            'body' => $data->body,
-            'priority' => $data->priority ?? UserNotificationPriority::Normal,
-            'correlation_id' => $this->currentCorrelationId(),
-        ]);
+        $notification = DB::transaction(function () use ($data, $batchId): UserNotification {
+            $notification = UserNotification::query()->create([
+                'user_id' => $data->userId,
+                'batch_id' => $batchId,
+                'channel' => $data->channel,
+                'subject' => $data->subject,
+                'body' => $data->body,
+                'priority' => $data->priority ?? UserNotificationPriority::Normal,
+                'correlation_id' => $this->currentCorrelationId(),
+                'is_scheduled' => $data->scheduledAt !== null,
+            ]);
+
+            if ($data->scheduledAt !== null) {
+                UserNotificationSchedule::query()->create([
+                    'user_notification_id' => $notification->id,
+                    'scheduled_at' => $data->scheduledAt,
+                ]);
+            }
+
+            return $notification;
+        });
 
         UserNotificationCreated::dispatch($notification);
 
@@ -60,25 +74,50 @@ class UserNotificationRepository
         $batchId = Str::uuid7()->toString();
         $now = now();
         $correlationId = $this->currentCorrelationId();
+        $schedules = [];
 
-        $rows = array_map(fn (UserNotificationData $item) => [
-            'user_id' => $item->userId,
-            'batch_id' => $batchId,
-            'channel' => $item->channel->value,
-            'subject' => $item->subject,
-            'body' => $item->body,
-            'priority' => ($item->priority ?? UserNotificationPriority::Normal)->value,
-            'correlation_id' => $correlationId,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ], $items);
+        $rows = array_map(function (UserNotificationData $item) use (&$schedules, $batchId, $now, $correlationId) {
+            $id = Str::uuid7()->toString();
 
-        UserNotification::query()->insert($rows);
+            if ($item->scheduledAt) {
+                $schedules[] = [
+                    'id' => Str::uuid7()->toString(),
+                    'user_notification_id' => $id,
+                    'scheduled_at' => $item->scheduledAt,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
 
-        $notifications = UserNotification::query()
-            ->with('user')
-            ->where('batch_id', $batchId)
-            ->get();
+            return [
+                'id' => $id,
+                'user_id' => $item->userId,
+                'batch_id' => $batchId,
+                'channel' => $item->channel->value,
+                'subject' => $item->subject,
+                'body' => $item->body,
+                'priority' => ($item->priority ?? UserNotificationPriority::Normal)->value,
+                'correlation_id' => $correlationId,
+                'is_scheduled' => $item->scheduledAt !== null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }, $items);
+
+        $notifications = DB::transaction(function () use ($rows, $schedules, $batchId): Collection {
+            UserNotification::query()->insert($rows);
+
+            $notifications = UserNotification::query()
+                ->with('user')
+                ->where('batch_id', $batchId)
+                ->get();
+
+            if ($schedules !== []) {
+                UserNotificationSchedule::query()->insert($schedules);
+            }
+
+            return $notifications;
+        });
 
         foreach ($notifications as $notification) {
             UserNotificationCreated::dispatch($notification);
@@ -87,7 +126,7 @@ class UserNotificationRepository
         return $notifications;
     }
 
-    public function status(?int $id = null, ?string $batchId = null): ?UserNotificationStatus
+    public function status(?string $id = null, ?string $batchId = null): ?UserNotificationStatus
     {
         if ($id !== null) {
             return UserNotification::query()->findOrFail($id)->status;

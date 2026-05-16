@@ -6,6 +6,7 @@ use App\Enums\UserNotificationStatus;
 use App\Models\UserNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -57,7 +58,7 @@ class MailpitWebhookTest extends TestCase
     {
         $this->postWebhook([
             'ID' => 'mailpit-abc',
-            'Tags' => ['notification-999999'],
+            'Tags' => ['notification-'.Str::uuid7()->toString()],
         ])->assertOk()->assertExactJson(['status' => 'ok']);
     }
 

@@ -17,11 +17,12 @@ class StoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id' => ['required', 'exists:users,id'],
+            'user_id' => ['required', 'uuid', 'exists:users,id'],
             'channel' => ['required', Rule::enum(UserNotificationChannel::class)],
             'body' => ['required', 'string', new BodyByChannel],
             'subject' => ['nullable', 'string', new SubjectByChannel],
             'priority' => ['nullable', Rule::enum(UserNotificationPriority::class)],
+            'scheduled_at' => ['nullable', 'date', 'after:now'],
         ];
     }
 }

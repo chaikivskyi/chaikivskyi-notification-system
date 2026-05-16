@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('user_notification_metrics', function (Blueprint $table) {
-            $table->foreignId('user_notification_id')
+            $table->foreignUuid('user_notification_id')
                 ->primary()
                 ->constrained('user_notifications')
                 ->cascadeOnDelete();

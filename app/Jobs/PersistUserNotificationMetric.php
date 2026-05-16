@@ -26,7 +26,7 @@ class PersistUserNotificationMetric implements ShouldQueue
     use SerializesModels;
 
     public function __construct(
-        public readonly int $notificationId,
+        public readonly string $notificationId,
         public readonly UserNotificationChannel $channel,
         public readonly UserNotificationStatus $newStatus,
         public readonly CarbonInterface $occurredAt,
@@ -46,7 +46,7 @@ class PersistUserNotificationMetric implements ShouldQueue
 
         if ($column === null) {
             $this->fail(new RuntimeException(sprintf(
-                'PersistUserNotificationMetric received unsupported status %s for notification %d.',
+                'PersistUserNotificationMetric received unsupported status %s for notification %s.',
                 $this->newStatus->value,
                 $this->notificationId,
             )));

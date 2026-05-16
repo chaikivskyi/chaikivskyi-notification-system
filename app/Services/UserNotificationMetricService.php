@@ -15,7 +15,7 @@ class UserNotificationMetricService
         private readonly MissedDeliveryLatencyCounter $missedDeliveryLatencyCounter,
     ) {}
 
-    public function markFirstTransition(int $notificationId, string $column, CarbonInterface $occurredAt): bool
+    public function markFirstTransition(string $notificationId, string $column, CarbonInterface $occurredAt): bool
     {
         $inserted = UserNotificationMetric::query()->insertOrIgnore([
             'user_notification_id' => $notificationId,
@@ -33,7 +33,7 @@ class UserNotificationMetricService
     }
 
     public function observeDeliveryLatency(
-        int $notificationId,
+        string $notificationId,
         UserNotificationChannel $channel,
         CarbonInterface $occurredAt,
     ): void {

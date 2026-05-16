@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * @property int $user_notification_id
+ * @property string $user_notification_id
  * @property ?Carbon $queued_at
  * @property ?Carbon $delivered_at
  * @property ?Carbon $failed_at
@@ -24,6 +24,8 @@ class UserNotificationMetric extends Model
     use HasFactory;
 
     protected $primaryKey = 'user_notification_id';
+
+    protected $keyType = 'string';
 
     public $incrementing = false;
 

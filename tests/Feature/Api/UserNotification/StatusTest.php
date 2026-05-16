@@ -83,7 +83,7 @@ class StatusTest extends TestCase
 
     public function test_rejects_unknown_id(): void
     {
-        $this->getJson('/api/user-notifications/status?id=999999')
+        $this->getJson('/api/user-notifications/status?id='.Str::uuid7()->toString())
             ->assertStatus(422)
             ->assertJsonValidationErrors('id');
     }
