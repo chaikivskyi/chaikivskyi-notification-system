@@ -26,6 +26,10 @@ The project runs entirely in Docker. The `app` service mounts the repo, and `ngi
    docker compose exec app php artisan queue:work sqs \
        --queue=notifications-high,notifications-normal,notifications-low,default
    ```
+5. Run the scheduler
+   ```bash
+   docker compose exec app php artisan schedule:work
+   ```
 
 Services exposed on the host:
 
