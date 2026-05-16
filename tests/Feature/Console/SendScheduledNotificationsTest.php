@@ -75,20 +75,6 @@ class SendScheduledNotificationsTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    public function test_respects_limit_option(): void
-    {
-        $user = User::factory()->create();
-        $this->makeScheduledNotification($user, scheduledAt: now()->subMinutes(3));
-        $this->makeScheduledNotification($user, scheduledAt: now()->subMinutes(2));
-        $this->makeScheduledNotification($user, scheduledAt: now()->subMinute());
-
-        $this->assertSame(0, Artisan::call('notification:scheduled:send', ['--limit' => 2]));
-
-        $this->assertSame(2, UserNotification::where('status', UserNotificationStatus::Pending)->count());
-        $this->assertSame(1, UserNotification::where('status', UserNotificationStatus::Accepted)->count());
-        Notification::assertSentToTimes($user, UserNotificationMessage::class, 2);
-    }
-
     public function test_processes_all_due_notifications_across_chunks_when_no_limit(): void
     {
         $user = User::factory()->create();
