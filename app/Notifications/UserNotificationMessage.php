@@ -29,6 +29,8 @@ class UserNotificationMessage extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    private const string DEFAULT_SUBJECT = 'Notification';
+
     public function __construct(public UserNotification $notification)
     {
         $this->onQueue(match ($notification->priority) {
@@ -116,7 +118,7 @@ class UserNotificationMessage extends Notification implements ShouldQueue
 
         return (new MailMessage)
             ->line($this->notification->body)
-            ->subject($this->notification->subject ?? 'Notification')
+            ->subject($this->notification->subject ?? self::DEFAULT_SUBJECT)
             ->withSymfonyMessage(function ($message) use ($notificationId): void {
                 $message->getHeaders()->addTextHeader('X-Tags', "notification-{$notificationId}");
             });
@@ -133,7 +135,7 @@ class UserNotificationMessage extends Notification implements ShouldQueue
     public function toPush(object $notifiable): array
     {
         return [
-            'title' => $this->notification->subject,
+            'title' => $this->notification->subject ?? self::DEFAULT_SUBJECT,
             'body' => $this->notification->body,
         ];
     }

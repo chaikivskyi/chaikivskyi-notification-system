@@ -105,4 +105,70 @@ class StoreBulkTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('notifications.0.channel');
     }
+
+    public function test_rejects_too_long_sms_body_in_item(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications/bulk', [
+            'notifications' => [
+                ['user_id' => $user->id, 'channel' => 'email', 'body' => 'a'],
+                ['user_id' => $user->id, 'channel' => 'sms', 'body' => str_repeat('a', 1601)],
+            ],
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('notifications.1.body');
+    }
+
+    public function test_rejects_too_long_push_body_in_item(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications/bulk', [
+            'notifications' => [
+                ['user_id' => $user->id, 'channel' => 'push', 'body' => str_repeat('a', 241)],
+            ],
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('notifications.0.body');
+    }
+
+    public function test_rejects_subject_for_sms_in_item(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications/bulk', [
+            'notifications' => [
+                ['user_id' => $user->id, 'channel' => 'sms', 'body' => 'x', 'subject' => 'Subj'],
+            ],
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('notifications.0.subject');
+    }
+
+    public function test_rejects_too_long_push_subject_in_item(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications/bulk', [
+            'notifications' => [
+                ['user_id' => $user->id, 'channel' => 'push', 'body' => 'x', 'subject' => str_repeat('a', 66)],
+            ],
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('notifications.0.subject');
+    }
+
+    public function test_accepts_channel_specific_limits_in_items(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications/bulk', [
+            'notifications' => [
+                ['user_id' => $user->id, 'channel' => 'sms', 'body' => str_repeat('a', 1600)],
+                ['user_id' => $user->id, 'channel' => 'push', 'body' => str_repeat('a', 240), 'subject' => str_repeat('a', 65)],
+                ['user_id' => $user->id, 'channel' => 'email', 'body' => str_repeat('a', 10000), 'subject' => str_repeat('a', 255)],
+            ],
+        ])->assertOk();
+    }
 }

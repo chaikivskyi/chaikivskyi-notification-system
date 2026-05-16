@@ -160,4 +160,92 @@ class StoreTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('subject');
     }
+
+    public function test_rejects_too_long_sms_body(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'sms',
+            'body' => str_repeat('a', 1601),
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('body');
+    }
+
+    public function test_accepts_sms_body_at_limit(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'sms',
+            'body' => str_repeat('a', 1600),
+        ])->assertCreated();
+    }
+
+    public function test_rejects_subject_for_sms(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'sms',
+            'body' => 'x',
+            'subject' => 'Subj',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('subject');
+    }
+
+    public function test_rejects_too_long_push_body(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'push',
+            'body' => str_repeat('a', 241),
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('body');
+    }
+
+    public function test_accepts_push_body_at_limit(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'push',
+            'body' => str_repeat('a', 240),
+        ])->assertCreated();
+    }
+
+    public function test_rejects_too_long_push_subject(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'push',
+            'body' => 'x',
+            'subject' => str_repeat('a', 66),
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('subject');
+    }
+
+    public function test_accepts_push_subject_at_limit(): void
+    {
+        $user = User::factory()->create();
+
+        $this->postJson('/api/user-notifications', [
+            'user_id' => $user->id,
+            'channel' => 'push',
+            'body' => 'x',
+            'subject' => str_repeat('a', 65),
+        ])->assertCreated();
+    }
 }
