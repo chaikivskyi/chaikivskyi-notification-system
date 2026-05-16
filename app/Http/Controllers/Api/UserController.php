@@ -23,7 +23,7 @@ class UserController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $perPage = (int)($data['per_page'] ?? Pagination::DEFAULT_PER_PAGE);
+        $perPage = (int) ($data['per_page'] ?? Pagination::DEFAULT_PER_PAGE);
 
         $users = User::query()
             ->orderBy('id')
