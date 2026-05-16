@@ -94,7 +94,7 @@ curl -X POST http://localhost:8080/api/user-notifications \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json' \
   -d '{
-    "user_id": 1,
+    "user_id": "0190abcd-0000-7000-8000-000000000001",
     "channel": "email",
     "subject": "Hello",
     "body": "Welcome to the service.",
@@ -102,7 +102,9 @@ curl -X POST http://localhost:8080/api/user-notifications \
   }'
 ```
 
-`channel` ∈ `email | sms | push`. `priority` ∈ `low | normal | high` (default `normal`).
+`channel` ∈ `email | sms | push`. `priority` ∈ `low | normal | high` (default `normal`). IDs throughout the API are UUID v7 strings.
+
+To delay delivery, add `"scheduled_at": "2026-12-01T15:00:00Z"` (ISO-8601, must be in the future).
 
 ### Bulk create
 
@@ -114,14 +116,13 @@ curl -X POST http://localhost:8080/api/user-notifications \
     --data '{
     "notifications": [
       {
-        "user_id": 1,
+        "user_id": "0190abcd-0000-7000-8000-000000000001",
         "channel": "sms",
         "body": "string",
-        "subject": "string",
         "priority": "low"
       },
       {
-        "user_id": 1,
+        "user_id": "0190abcd-0000-7000-8000-000000000001",
         "channel": "email",
         "body": "string",
         "subject": "string",
@@ -144,8 +145,8 @@ Filter keys: `status`, `channel`, `created_from`, `created_to`. Standard Laravel
 ### Status of a single notification or a batch
 
 ```bash
-curl 'http://localhost:8080/api/user-notifications/status?id=1'
-curl 'http://localhost:8080/api/user-notifications/status?batch_id=018f...'
+curl 'http://localhost:8080/api/user-notifications/status?id={notificationId}'
+curl 'http://localhost:8080/api/user-notifications/status?batch_id={batchId}'
 ```
 
 Exactly one of `id` or `batch_id` is required. For a batch, the response collapses to the least-progressed status (`accepted > pending > failed > canceled > delivered`).
@@ -153,7 +154,7 @@ Exactly one of `id` or `batch_id` is required. For a batch, the response collaps
 ### Cancel a notification
 
 ```bash
-curl -X PATCH http://localhost:8080/api/user-notifications/42/cancel
+curl -X PATCH http://localhost:8080/api/user-notifications/{notificationId}/cancel
 ```
 
 Cancellation is a hard transition to `canceled`; it does **not** retract a job that is already mid-flight.
