@@ -1,7 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserNotificationController;
 use Illuminate\Support\Facades\Route;
+
+Route::apiResource('/users', UserController::class)->only(['index']);
 
 Route::prefix('user-notifications')->controller(UserNotificationController::class)->group(function () {
     Route::get('/', 'index')->name('user-notifications.index');
